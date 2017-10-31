@@ -1,0 +1,97 @@
+buildscript {
+    repositories {
+        jcenter()
+    }
+
+    dependencies {
+        classpath 'gradle.plugin.com.github.maiflai:gradle-scalatest:0.12',
+                'com.bmuschko:gradle-nexus-plugin:2.3.1'
+    }
+}
+
+plugins {
+    id 'net.researchgate.release' version '2.4.0'
+}
+
+apply plugin: 'scala'
+apply plugin: 'maven'
+apply plugin: 'com.bmuschko.nexus'
+apply plugin: 'com.github.maiflai.scalatest'
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+    jcenter()
+    maven { url "https://services.api.bskyb.com/nexus/content/repositories/sky-releases/" }
+    maven { url "http://buildrepo.nowtv.bskyb.com/repo" }
+    maven {
+        credentials {
+            username nexusUsername
+            password nexusPassword
+        }
+        url "https://nexus.nowtv.bskyb.com/repository/payments_maven/releases/"
+    }
+}
+
+tasks.withType(ScalaCompile) {
+    configure(scalaCompileOptions.forkOptions) {
+        memoryMaximumSize = '1g'
+    }
+}
+
+ext.versions = [
+        aspectjweaver: '1.8.7',
+        scala        : '2.12.4',
+        akkaHttp     : '2.5.4',
+        circe        : '0.8.0'
+]
+
+dependencies {
+    compile "org.scala-lang:scala-library:$versions.scala",
+            "net.logstash.logback:logstash-logback-encoder:4.6",
+            "com.typesafe.akka:akka-http_2.12:10.0.10",
+            "com.typesafe.akka:akka-stream_2.12:$versions.akkaHttp",
+            "com.typesafe.akka:akka-actor_2.12:$versions.akkaHttp",
+            'com.github.swagger-akka-http:swagger-akka-http_2.12:0.11.0',
+            'de.heikoseeberger:akka-http-circe_2.12:1.18.1',
+            "io.circe:circe-generic_2.12:$versions.circe"
+            "io.circe:circe-core_2.12:$versions.circe"
+            "io.circe:circe-parser_2.12:$versions.circe"
+
+    testCompile "io.spray:spray-testkit_2.12:$versions.spray",
+            'org.scalatest:scalatest_2.12:2.2.6',
+            'com.typesafe.play:play-json_2.12:2.4.0',
+            'org.mockito:mockito-core:2.1.0',
+            'org.pegdown:pegdown:1.1.0'
+}
+
+def mainClassName = 'com.njp.akka.microservice.Application'
+
+tasks.withType(Test) {
+    maxParallelForks = 1
+}
+
+release {
+    tagTemplate = 'v${version}'
+    preTagCommitMessage = '[Release] - Tagging: '
+}
+
+extraArchive {
+    sources = true
+    tests = true
+    javadoc = false
+}
+
+task run(type: JavaExec) {
+    main = mainClassName
+    classpath = sourceSets.main.runtimeClasspath
+    systemProperties = System.getProperties()
+}
+
+nexus {
+    sign = false
+    repositoryUrl = System.getenv('NEXUS_REPO') + '/repository/' + System.getenv('NEXUS_TEAM') + '/releases/'
+    snapshotRepositoryUrl = System.getenv('NEXUS_REPO') + '/repository/' + System.getenv('NEXUS_TEAM') + 'snapshots/'
+}
+
+afterReleaseBuild.dependsOn uploadArchives
