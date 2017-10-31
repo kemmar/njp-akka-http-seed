@@ -42,25 +42,22 @@ tasks.withType(ScalaCompile) {
 ext.versions = [
         aspectjweaver: '1.8.7',
         scala        : '2.12.4',
-        akkaHttp     : '2.5.4',
+        akkaHttp     : '10.0.10',
         circe        : '0.8.0'
 ]
 
 dependencies {
     compile "org.scala-lang:scala-library:$versions.scala",
             "net.logstash.logback:logstash-logback-encoder:4.6",
-            "com.typesafe.akka:akka-http_2.12:10.0.10",
-            "com.typesafe.akka:akka-stream_2.12:$versions.akkaHttp",
-            "com.typesafe.akka:akka-actor_2.12:$versions.akkaHttp",
+            "com.typesafe.akka:akka-http_2.12:$versions.akkaHttp",
             'com.github.swagger-akka-http:swagger-akka-http_2.12:0.11.0',
             'de.heikoseeberger:akka-http-circe_2.12:1.18.1',
             "io.circe:circe-generic_2.12:$versions.circe"
             "io.circe:circe-core_2.12:$versions.circe"
             "io.circe:circe-parser_2.12:$versions.circe"
 
-    testCompile "io.spray:spray-testkit_2.12:$versions.spray",
-            'org.scalatest:scalatest_2.12:2.2.6',
-            'com.typesafe.play:play-json_2.12:2.4.0',
+    testCompile "com.typesafe.akka:akka-http-testkit_2.12:$versions.akkaHttp",
+            'org.scalatest:scalatest_2.12:3.0.4',
             'org.mockito:mockito-core:2.1.0',
             'org.pegdown:pegdown:1.1.0'
 }
@@ -95,3 +92,22 @@ nexus {
 }
 
 afterReleaseBuild.dependsOn uploadArchives
+
+project.tasks.create('printLinkToTestReports').doLast({
+    println "Component junit reports are outputed to file://$project.buildDir/reports/test/index.html"
+})
+
+test.finalizedBy(printLinkToTestReports)
+
+test {
+    reports.html.destination = project.file("${project.reporting.baseDir}/test")
+    reports.junitXml.destination = project.file("${project.buildDir}/test-results")
+}
+
+task spec(dependsOn: ['testClasses'], type: JavaExec) {
+    main = 'org.scalatest.tools.Runner'
+    args = ['-R', 'build/classes/test', '-h', "build/reports/test", '-u', 'build/test-results', '-o']
+    classpath = sourceSets.test.runtimeClasspath
+}
+
+test.dependsOn spec
